@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Privacy Policy — RJ GitHub→LinkedIn Devlog Bot</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; line-height: 1.5; margin: 0; }
+    main { max-width: 900px; margin: 0 auto; padding: 32px 20px; }
+    h1 { margin: 0 0 8px; }
+    .meta { color: #555; margin: 0 0 24px; }
+    h2 { margin-top: 28px; }
+    code, pre { background: #f6f8fa; padding: 2px 6px; border-radius: 6px; }
+    .box { background: #f6f8fa; padding: 14px 16px; border-radius: 10px; }
+    a { color: inherit; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Privacy Policy</h1>
+    <p class="meta">
+      <strong>App:</strong> RJ GitHub→LinkedIn Devlog Bot (personal use)<br />
+      <strong>Effective date:</strong> January 27, 2026<br />
+      <strong>Contact:</strong> RJ — <a href="mailto:YOUR_EMAIL_HERE">YOUR_EMAIL_HERE</a>
+    </p>
+
+    <div class="box">
+      <strong>Personal-use notice:</strong> This app is a private automation used only by me (RJ) to post updates to my own LinkedIn account
+      from my own GitHub repositories. It is not offered as a public service, and no other users are supported.
+    </div>
+
+    <h2>What this app does</h2>
+    <p>
+      The app runs as an automation (typically via GitHub Actions) when I push commits to my repositories, generates a short summary,
+      and publishes that summary to my LinkedIn account.
+    </p>
+
+    <h2>Information processed</h2>
+    <p>The app may temporarily process the following:</p>
+    <ul>
+      <li><strong>GitHub activity data:</strong> repository name, branch, commit IDs, commit messages, changed file paths, and compare links.</li>
+      <li><strong>Optional code context:</strong> limited diff/patch text or line-change counts, if enabled for better summaries.</li>
+      <li><strong>LinkedIn data:</strong> authorization tokens and my LinkedIn member identifier (URN) required to publish a post.</li>
+    </ul>
+
+    <h2>How information is used</h2>
+    <p>
+      Information is used only to (1) decide whether a push is “postable,” (2) generate a short post draft, and (3) publish the post to my LinkedIn account.
+      The app is designed to avoid posting sensitive data (for example, strings that look like API keys/tokens).
+    </p>
+
+    <h2>AI / third-party processing (optional)</h2>
+    <p>
+      If AI summarization is enabled, the app sends the minimum necessary GitHub activity details (such as commit messages and changed file paths,
+      and optionally small diff snippets) to a text-generation service to produce the post text.
+      No unrelated personal data is intentionally sent.
+    </p>
+
+    <h2>Data storage and retention</h2>
+    <p>
+      The app does not use a dedicated database. It is intended to process data in memory and discard it after posting.
+      However, some data may be retained by third parties as part of normal operations:
+    </p>
+    <ul>
+      <li><strong>GitHub:</strong> repository history and commit data (as part of Git itself), and GitHub Actions workflow logs/artifacts if enabled.</li>
+      <li><strong>LinkedIn:</strong> the published post and associated metadata, according to LinkedIn’s platform behavior.</li>
+      <li><strong>Hosting/automation provider:</strong> standard security/operational logs (for example, GitHub Actions logs).</li>
+    </ul>
+    <p>
+      Secrets (such as LinkedIn OAuth credentials/tokens) are stored as private CI secrets (for example, GitHub Actions Secrets) and are not published.
+    </p>
+
+    <h2>Sharing</h2>
+    <p>
+      Data is not sold. Data is shared only with services necessary to run the automation:
+      GitHub (to run workflows and access repo content), LinkedIn (to publish posts), and optionally an AI text-generation provider (if enabled).
+    </p>
+
+    <h2>Your choices / control</h2>
+    <ul>
+      <li>Disable the GitHub Actions workflow (or equivalent automation) to stop processing.</li>
+      <li>Revoke the app’s access in LinkedIn account settings to stop posting.</li>
+      <li>Rotate/revoke tokens and update CI secrets at any time.</li>
+    </ul>
+
+    <h2>Changes to this policy</h2>
+    <p>
+      If the app’s behavior changes in a way that affects privacy (for example, storing additional data or adding new third-party services),
+      this policy will be updated and the effective date will be changed.
+    </p>
+  </main>
+</body>
+</html>
