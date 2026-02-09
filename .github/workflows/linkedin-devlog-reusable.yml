@@ -1,0 +1,118 @@
+name: LinkedIn Devlog (Reusable)
+
+on:
+  workflow_call:
+    secrets:
+      LINKEDIN_AUTHOR_URN:
+        required: true
+      LINKEDIN_ACCESS_TOKEN:
+        required: false
+      LINKEDIN_REFRESH_TOKEN:
+        required: false
+      LINKEDIN_CLIENT_ID:
+        required: false
+      LINKEDIN_CLIENT_SECRET:
+        required: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Build summary + post
+        env:
+          AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
+          ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          REFRESH_TOKEN: ${{ secrets.LINKEDIN_REFRESH_TOKEN }}
+          CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+          REPO: ${{ github.repository }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, subprocess, sys, urllib.parse, urllib.request
+
+          def sh(*cmd):
+            return subprocess.check_output(cmd, text=True).strip()
+
+          before, after = os.getenv("BEFORE"), os.getenv("AFTER")
+          repo, author = os.getenv("REPO"), os.getenv("AUTHOR_URN")
+          if not (before and after and repo and author):
+            print("Missing BEFORE/AFTER/REPO/AUTHOR_URN"); sys.exit(1)
+
+          compare_url = f"https://github.com/{repo}/compare/{before}...{after}"
+          rev_range = f"{before}..{after}"
+
+          subjects = sh("git","log","--format=%s",rev_range).splitlines()
+          files = sh("git","diff","--name-only",rev_range).splitlines()
+
+          if not files:
+            print("Skip: no file changes"); sys.exit(0)
+
+          # Baseline filters
+          doc_only = all(f.lower().endswith(".md") or f.startswith("docs/") for f in files)
+          merge_only = subjects and all(s.lower().startswith("merge") for s in subjects)
+          if doc_only or merge_only:
+            print("Skip: doc-only or merge-only"); sys.exit(0)
+
+          # Minimal secret-ish scan (commit subjects only)
+          joined = "\n".join(subjects)
+          if re.search(r"(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|BEGIN (RSA |EC )?PRIVATE KEY)", joined):
+            print("Refuse: possible secret pattern in commit message"); sys.exit(0)
+
+          top = subjects[:3]
+          bullets = "\n".join([f"• {s}" for s in top]) or "• Updates"
+          text = f"Dev update from {repo}:\n\n{bullets}\n\nCompare: {compare_url}"
+
+          def get_access_token():
+            rt, cid, cs = os.getenv("REFRESH_TOKEN",""), os.getenv("CLIENT_ID",""), os.getenv("CLIENT_SECRET","")
+            if rt and cid and cs:
+              data = urllib.parse.urlencode({
+                "grant_type":"refresh_token",
+                "refresh_token":rt,
+                "client_id":cid,
+                "client_secret":cs,
+              }).encode()
+              req = urllib.request.Request(
+                "https://www.linkedin.com/oauth/v2/accessToken",
+                data=data,
+                headers={"Content-Type":"application/x-www-form-urlencoded"},
+                method="POST"
+              )
+              with urllib.request.urlopen(req, timeout=30) as r:
+                return json.load(r).get("access_token")
+            return os.getenv("ACCESS_TOKEN","")
+
+          token = get_access_token()
+          if not token:
+            print("No LinkedIn token available"); sys.exit(1)
+
+          body = {
+            "author": author,
+            "lifecycleState": "PUBLISHED",
+            "specificContent": {
+              "com.linkedin.ugc.ShareContent": {
+                "shareCommentary": {"text": text},
+                "shareMediaCategory": "ARTICLE",
+                "media": [{"status":"READY","originalUrl": compare_url}],
+              }
+            },
+            "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
+          }
+
+          req = urllib.request.Request(
+            "https://api.linkedin.com/v2/ugcPosts",
+            data=json.dumps(body).encode("utf-8"),
+            headers={
+              "Authorization": f"Bearer {token}",
+              "Content-Type": "application/json",
+              "X-Restli-Protocol-Version": "2.0.0",
+            },
+            method="POST",
+          )
+          with urllib.request.urlopen(req, timeout=30) as r:
+            print("Posted:", r.status)
+          PY
