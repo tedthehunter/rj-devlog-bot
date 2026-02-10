@@ -29,6 +29,8 @@ on:
         required: false
       LINKEDIN_CLIENT_SECRET:
         required: false
+      OPENAI_API_KEY:
+        required: false
 
 permissions:
   contents: read
@@ -62,4 +64,5 @@ jobs:
           GITHUB_REPO: ${{ github.repository }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: python3 -u bot/scripts/linkedin_devlog.py --repo-path target
