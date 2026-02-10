@@ -5,7 +5,7 @@ set -euo pipefail
 BOT_OWNER="tedthehunter"
 BOT_REPO="rj-devlog-bot"
 BOT_WORKFLOW_PATH=".github/workflows/linkedin-devlog-reusable.yml"
-BOT_REF="v1"   # tag/branch/SHA in the bot repo
+BOT_REF="main"   # tag/branch/SHA in the bot repo
 
 TARGET=".github/workflows/linkedin-devlog.yml"
 
@@ -46,6 +46,7 @@ jobs:
       LINKEDIN_REFRESH_TOKEN: \${{ secrets.LINKEDIN_REFRESH_TOKEN }}
       LINKEDIN_CLIENT_ID: \${{ secrets.LINKEDIN_CLIENT_ID }}
       LINKEDIN_CLIENT_SECRET: \${{ secrets.LINKEDIN_CLIENT_SECRET }}
+      OPENAI_API_KEY: \${{ secrets.OPENAI_API_KEY }}
 YAML
 
 echo "✅ Created $TARGET in $REPO_NWO"
