@@ -23,6 +23,12 @@ on:
         required: true
       LINKEDIN_ACCESS_TOKEN:
         required: true
+      LINKEDIN_REFRESH_TOKEN:
+        required: false
+      LINKEDIN_CLIENT_ID:
+        required: false
+      LINKEDIN_CLIENT_SECRET:
+        required: false
 
 permissions:
   contents: read
