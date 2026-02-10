@@ -128,14 +128,14 @@ def looks_merge_only(subjects: List[str]) -> bool:
 def build_post_text(repo: str, subjects: List[str], shortstat: str, link_url: str) -> str:
     top = [s.strip() for s in subjects if s.strip()][:3]
     bullets = "\n".join(f"• {s}" for s in top) if top else "• Updates"
-
     stat_line = f"\n\n{shortstat}" if shortstat else ""
     return (
         f"Dev update from {repo}:\n\n"
         f"{bullets}"
         f"{stat_line}\n\n"
-        f"Compare: {link_url}"
+        f"{link_url}"
     )
+
 
 
 def request_json(url: str, token: str, method: str = "GET", body: Optional[dict] = None, headers: Optional[dict] = None) -> Tuple[int, dict, str]:
@@ -235,7 +235,7 @@ def main() -> int:
     after = (os.getenv("AFTER_SHA") or "").strip()
     visibility = (os.getenv("LINKEDIN_VISIBILITY") or "PUBLIC").strip()
     version = (os.getenv("LINKEDIN_VERSION") or "202601").strip()
-    mode = (os.getenv("LINKEDIN_POST_MODE") or "auto").strip().lower()
+    mode = (os.getenv("LINKEDIN_POST_MODE") or "ugc").strip().lower()
     dry_run = (os.getenv("DRY_RUN") or "").strip() in {"1", "true", "yes"}
 
     # Safe diagnostics (no token leak)
