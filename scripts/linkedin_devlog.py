@@ -137,6 +137,46 @@ def build_post_text(repo: str, subjects: List[str], shortstat: str, link_url: st
     )
 
 
+def summarize_with_openai(style: str, repo: str, subjects: List[str], files: List[str], shortstat: str, link_url: str, diff_excerpt: str) -> str:
+    api_key = (os.getenv("OPENAI_API_KEY") or "").strip()
+    if not api_key:
+        return ""
+
+    model = (os.getenv("OPENAI_MODEL") or "gpt-4.1-mini").strip()
+
+    prompt = {
+        "repo": repo,
+        "commit_subjects": subjects[:10],
+        "changed_files": files[:30],
+        "shortstat": shortstat,
+        "diff_excerpt": diff_excerpt[:12000],
+        "link": link_url,
+    }
+
+    payload = {
+        "model": model,
+        "input": [
+            {"role": "system", "content": f"You are rewriting a LinkedIn devlog post.\n\nSTYLE GUIDE:\n{style}"},
+            {"role": "user", "content": f"Rewrite this as a short LinkedIn post.\n\nDATA:\n{json.dumps(prompt, indent=2)}"},
+        ],
+    }
+
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/responses",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=45) as r:
+        out = json.load(r)
+
+    # Responses API returns output text in a structured way; this covers common cases.
+    for item in out.get("output", []):
+        for c in item.get("content", []):
+            if c.get("type") == "output_text" and c.get("text"):
+                return c["text"].strip()
+    return ""
+
 
 def request_json(url: str, token: str, method: str = "GET", body: Optional[dict] = None, headers: Optional[dict] = None) -> Tuple[int, dict, str]:
     data = None if body is None else json.dumps(body).encode("utf-8")
@@ -283,7 +323,18 @@ def main() -> int:
     else:
         link_url = f"https://github.com/{repo}"
 
-    text = build_post_text(repo, subjects, shortstat, link_url)
+    fallback = build_post_text(repo, subjects, shortstat, link_url)
+
+    style_path = os.getenv("STYLE_GUIDE_PATH") or os.path.join(os.path.dirname(__file__), "..", "prompts", "style_guide.txt")
+    try:
+        with open(style_path, "r", encoding="utf-8") as f:
+            style = f.read()
+    except FileNotFoundError:
+        style = ""
+    
+    ai = summarize_with_openai(style, repo, subjects, files, shortstat, link_url, diff_excerpt="")
+    text = ai or fallback
+
 
     if dry_run:
         eprint("DRY_RUN=1, not posting. Text would be:\n", text)
