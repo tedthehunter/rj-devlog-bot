@@ -2,144 +2,58 @@ name: LinkedIn Devlog (Reusable)
 
 on:
   workflow_call:
+    inputs:
+      linkedin_version:
+        type: string
+        default: "202601"   # YYYYMM
+      linkedin_visibility:
+        type: string
+        default: "PUBLIC"
+      post_mode:
+        type: string
+        default: "auto"     # auto|posts|ugc
+      dry_run:
+        type: boolean
+        default: false
+      bot_ref:
+        type: string
+        default: "main"     # set to v1 if you tag releases
     secrets:
       LINKEDIN_AUTHOR_URN:
         required: true
       LINKEDIN_ACCESS_TOKEN:
-        required: false
-      LINKEDIN_REFRESH_TOKEN:
-        required: false
-      LINKEDIN_CLIENT_ID:
-        required: false
-      LINKEDIN_CLIENT_SECRET:
-        required: false
+        required: true
+
+permissions:
+  contents: read
 
 jobs:
   post:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+      - name: Checkout target repo (caller)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: target
+
+      - name: Checkout rj-devlog-bot (for python script)
+        uses: actions/checkout@v4
+        with:
+          repository: tedthehunter/rj-devlog-bot
+          ref: ${{ inputs.bot_ref }}
+          fetch-depth: 1
+          path: bot
 
       - name: Build summary + post
         env:
-          AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
-          ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
-          REFRESH_TOKEN: ${{ secrets.LINKEDIN_REFRESH_TOKEN }}
-          CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
-          CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
-          REPO: ${{ github.repository }}
-          BEFORE: ${{ github.event.before }}
-          AFTER: ${{ github.sha }}
-          LINKEDIN_VERSION: "202601"   # YYYYMM
-
-        run: |
-          python3 - <<'PY'
-          import json, os, re, subprocess, sys, urllib.parse, urllib.request, urllib.error
-
-          def sh(*cmd):
-            return subprocess.check_output(cmd, text=True).strip()
-
-          before, after = os.getenv("BEFORE"), os.getenv("AFTER")
-          repo, author = os.getenv("REPO"), os.getenv("AUTHOR_URN")
-          if not (before and after and repo and author):
-            print("Missing BEFORE/AFTER/REPO/AUTHOR_URN"); sys.exit(1)
-
-          compare_url = f"https://github.com/{repo}/compare/{before}...{after}"
-          rev_range = f"{before}..{after}"
-
-          subjects = sh("git","log","--format=%s",rev_range).splitlines()
-          files = sh("git","diff","--name-only",rev_range).splitlines()
-
-          if not files:
-            print("Skip: no file changes"); sys.exit(0)
-
-          # Baseline filters
-          doc_only = all(f.lower().endswith(".md") or f.startswith("docs/") for f in files)
-          merge_only = subjects and all(s.lower().startswith("merge") for s in subjects)
-          if doc_only or merge_only:
-            print("Skip: doc-only or merge-only"); sys.exit(0)
-
-          # Minimal secret-ish scan (commit subjects only)
-          joined = "\n".join(subjects)
-          if re.search(r"(AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|BEGIN (RSA |EC )?PRIVATE KEY)", joined):
-            print("Refuse: possible secret pattern in commit message"); sys.exit(0)
-
-          top = subjects[:3]
-          bullets = "\n".join([f"• {s}" for s in top]) or "• Updates"
-          text = f"Dev update from {repo}:\n\n{bullets}\n\nCompare: {compare_url}"
-
-          def get_access_token():
-            rt, cid, cs = os.getenv("REFRESH_TOKEN",""), os.getenv("CLIENT_ID",""), os.getenv("CLIENT_SECRET","")
-            if rt and cid and cs:
-              data = urllib.parse.urlencode({
-                "grant_type":"refresh_token",
-                "refresh_token":rt,
-                "client_id":cid,
-                "client_secret":cs,
-              }).encode()
-              req = urllib.request.Request(
-                "https://www.linkedin.com/oauth/v2/accessToken",
-                data=data,
-                headers={"Content-Type":"application/x-www-form-urlencoded"},
-                method="POST"
-              )
-              with urllib.request.urlopen(req, timeout=30) as r:
-                return json.load(r).get("access_token")
-            return os.getenv("ACCESS_TOKEN","")
-
-          token = get_access_token()
-          if not token:
-            print("No LinkedIn token available"); sys.exit(1)
-
-          def http_json(url, token, body):
-            ver = os.getenv("LINKEDIN_VERSION", "202601")  # YYYYMM
-            req = urllib.request.Request(
-              url,
-              data=json.dumps(body).encode("utf-8"),
-              headers={
-                "Authorization": f"Bearer {token}",
-                "Content-Type": "application/json",
-                "X-Restli-Protocol-Version": "2.0.0",
-                "Linkedin-Version": ver,
-            },
-            method="POST",
-          )
-          try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-              return r.status, dict(r.headers), r.read().decode("utf-8", "replace")
-          except urllib.error.HTTPError as e:
-            err_body = e.read().decode("utf-8", "replace")
-            print("LinkedIn HTTPError:", e.code, e.reason)
-            print("Body:", err_body)
-            raise
-
-            print("Token length:", len(token))
-
-          # token validity check (should be 200)
-          try:
-              req = urllib.request.Request(
-                  "https://api.linkedin.com/v2/userinfo",
-                  headers={"Authorization": f"Bearer {token}"},
-                  method="GET",
-              )
-              with urllib.request.urlopen(req, timeout=30) as r:
-                  print("userinfo:", r.status)
-          except urllib.error.HTTPError as e:
-              print("userinfo failed:", e.code, e.read().decode("utf-8","replace"))
-              raise
-          
-          # Posts API (text-only)
-          post_body = {
-              "author": author,
-              "commentary": text,
-              "visibility": "PUBLIC",
-              "distribution": {"feedDistribution": "MAIN_FEED", "targetEntities": [], "thirdPartyDistributionChannels": []},
-              "lifecycleState": "PUBLISHED",
-              "isReshareDisabledByAuthor": False,
-          }
-          
-          status, headers, body = http_json("https://api.linkedin.com/rest/posts", token, post_body)
-          print("Posted:", status)
-          print("x-restli-id:", headers.get("x-restli-id"))
-          PY
+          LINKEDIN_AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
+          LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+          LINKEDIN_VERSION: ${{ inputs.linkedin_version }}
+          LINKEDIN_VISIBILITY: ${{ inputs.linkedin_visibility }}
+          LINKEDIN_POST_MODE: ${{ inputs.post_mode }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          GITHUB_REPO: ${{ github.repository }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: python3 -u bot/scripts/linkedin_devlog.py --repo-path target
